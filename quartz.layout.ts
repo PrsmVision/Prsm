@@ -4,16 +4,7 @@ import * as Component from "./quartz/components"
 // components shared across all pages
 export const sharedPageComponents: SharedLayout = {
   head: Component.Head(),
-  header: [
-    // ▼ Animação ASCII no topo de todas as páginas.
-    Component.AsciiHeader({
-      text: "PrismaVision",   // ← troque pelo nome do seu site
-      height: 180,            // altura do banner em px
-      asciiFontSize: 8,       // menor = mais denso
-      textColor: "#fdf9f3",   // cor do texto 3D
-      enableWaves: true,      // ondas animadas
-    }),
-  ],
+  header: [],
   afterBody: [],
   footer: Component.Footer({
     links: {

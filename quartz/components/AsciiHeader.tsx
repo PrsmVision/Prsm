@@ -328,3 +328,6 @@ export default ((opts?: Partial<Options>) => {
   start();
 })();
 `
+
+  return AsciiHeader
+}) satisfies QuartzComponentConstructor

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+    <channel>
+      <title>Quartz 4</title>
+      <link>https://quartz.jzhao.xyz</link>
+      <description>Last 10 notes on Quartz 4</description>
+      <generator>Quartz -- quartz.jzhao.xyz</generator>
+      <item>
+    <title>Test</title>
+    <link>https://quartz.jzhao.xyz/Test</link>
+    <guid>https://quartz.jzhao.xyz/Test</guid>
+    <description><![CDATA[ AAAAAAAAAAAAAA Teste 2. ]]></description>
+    <pubDate>Thu, 14 May 2026 21:30:13 GMT</pubDate>
+  </item><item>
+    <title>Welcome to Quartz 4</title>
+    <link>https://quartz.jzhao.xyz/</link>
+    <guid>https://quartz.jzhao.xyz/</guid>
+    <description><![CDATA[ Quartz is a fast, batteries-included static-site generator that transforms Markdown content into fully functional websites. ]]></description>
+    <pubDate>Thu, 14 May 2026 21:08:19 GMT</pubDate>
+  </item>
+    </channel>
+  </rss>

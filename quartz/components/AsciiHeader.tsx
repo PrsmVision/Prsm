@@ -1,5 +1,4 @@
 // quartz/components/AsciiHeader.tsx
-// Coloque este arquivo em: quartz/components/AsciiHeader.tsx
 
 import { QuartzComponent, QuartzComponentConstructor } from "./types"
 
@@ -45,7 +44,6 @@ export default ((opts?: Partial<Options>) => {
   padding: 0 !important;
   user-select: none;
   line-height: 1em !important;
-  text-align: left;
   position: absolute;
   left: 0;
   top: 0;
@@ -59,339 +57,274 @@ export default ((opts?: Partial<Options>) => {
 }
 #ascii-header-root canvas {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: 0; top: 0;
   width: 100% !important;
   height: 100% !important;
   image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 `
 
   AsciiHeader.afterDOMLoaded = `
 (function () {
+  // ── Roda só uma vez por carregamento de página ─────────────────
+  // O afterDOMLoaded é re-executado a cada nav no Quartz SPA,
+  // então guardamos tudo no window para não duplicar.
+  if (window.__ascii_registered) return;
+  window.__ascii_registered = true;
+
   const PX = window.devicePixelRatio || 1;
+  Math.map = (n,a,b,c,d) => ((n-a)/(b-a))*(d-c)+c;
 
-  Math.map = function (n, a, b, c, d) {
-    return ((n - a) / (b - a)) * (d - c) + c;
-  };
-
-  const vertexShader = \`
+  const vert = \`
     varying vec2 vUv;
     uniform float uTime;
     uniform float uEnableWaves;
-    void main() {
-      vUv = uv;
-      float t = uTime * 5.;
-      float w = uEnableWaves;
-      vec3 p = position;
-      p.x += sin(t + position.y) * 0.5 * w;
-      p.y += cos(t + position.z) * 0.15 * w;
-      p.z += sin(t + position.x) * w;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    void main(){
+      vUv=uv;
+      float t=uTime*5.;float w=uEnableWaves;
+      vec3 p=position;
+      p.x+=sin(t+position.y)*.5*w;
+      p.y+=cos(t+position.z)*.15*w;
+      p.z+=sin(t+position.x)*w;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
     }
   \`;
-
-  const fragmentShader = \`
+  const frag = \`
     varying vec2 vUv;
     uniform float uTime;
     uniform sampler2D uTexture;
-    void main() {
-      float t = uTime;
-      vec2 pos = vUv;
-      float r = texture2D(uTexture, pos + cos(t * 2. - t + pos.x) * .01).r;
-      float g = texture2D(uTexture, pos + tan(t * .5 + pos.x - t) * .01).g;
-      float b = texture2D(uTexture, pos - cos(t * 2. + t + pos.y) * .01).b;
-      float a = texture2D(uTexture, pos).a;
-      gl_FragColor = vec4(r, g, b, a);
+    void main(){
+      float t=uTime;vec2 pos=vUv;
+      float r=texture2D(uTexture,pos+cos(t*2.-t+pos.x)*.01).r;
+      float g=texture2D(uTexture,pos+tan(t*.5+pos.x-t)*.01).g;
+      float b=texture2D(uTexture,pos-cos(t*2.+t+pos.y)*.01).b;
+      float a=texture2D(uTexture,pos).a;
+      gl_FragColor=vec4(r,g,b,a);
     }
   \`;
 
   class AsciiFilter {
-    constructor(renderer, { fontSize, fontFamily, charset, invert } = {}) {
-      this.renderer   = renderer;
-      this.domElement = document.createElement("div");
-      this.domElement.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;";
-      this.pre    = document.createElement("pre");
+    constructor(renderer,{fontSize,fontFamily,charset,invert}={}){
+      this.renderer=renderer;
+      this.domElement=document.createElement("div");
+      this.domElement.style.cssText="position:absolute;top:0;left:0;width:100%;height:100%;";
+      this.pre=document.createElement("pre");
       this.domElement.appendChild(this.pre);
-      this.canvas  = document.createElement("canvas");
-      this.context = this.canvas.getContext("2d");
+      this.canvas=document.createElement("canvas");
+      this.context=this.canvas.getContext("2d");
       this.domElement.appendChild(this.canvas);
-      this.deg     = 0;
-      this.invert  = invert ?? true;
-      this.fontSize   = fontSize   ?? 12;
-      this.fontFamily = fontFamily ?? "'Courier New',monospace";
-      this.charset    = charset    ?? " .'^\\",:;Il!i~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
-      const ctx = this.context;
-      ctx.webkitImageSmoothingEnabled = false;
-      ctx.mozImageSmoothingEnabled    = false;
-      ctx.msImageSmoothingEnabled     = false;
-      ctx.imageSmoothingEnabled       = false;
-      this._onMove = this._onMove.bind(this);
-      document.addEventListener("mousemove", this._onMove);
+      this.deg=0;
+      this.invert=invert??true;
+      this.fontSize=fontSize??12;
+      this.fontFamily=fontFamily??"'Courier New',monospace";
+      this.charset=charset??" .'^\\",:;Il!i~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+      const c=this.context;
+      c.webkitImageSmoothingEnabled=c.mozImageSmoothingEnabled=c.msImageSmoothingEnabled=c.imageSmoothingEnabled=false;
+      this._mv=this._mv.bind(this);
+      document.addEventListener("mousemove",this._mv);
     }
-    setSize(w, h) {
-      this.width = w; this.height = h;
-      this.renderer.setSize(w, h);
+    setSize(w,h){
+      this.width=w;this.height=h;
+      this.renderer.setSize(w,h);
       this._reset();
-      this.center = { x: w / 2, y: h / 2 };
-      this.mouse  = { x: this.center.x, y: this.center.y };
+      this.center={x:w/2,y:h/2};
+      this.mouse={x:w/2,y:h/2};
     }
-    _reset() {
-      const ctx = this.context;
-      ctx.font = \`\${this.fontSize}px \${this.fontFamily}\`;
-      const cw = ctx.measureText("A").width;
-      this.cols = Math.floor(this.width  / (this.fontSize * (cw / this.fontSize)));
-      this.rows = Math.floor(this.height / this.fontSize);
-      this.canvas.width  = this.cols;
-      this.canvas.height = this.rows;
-      Object.assign(this.pre.style, {
-        fontFamily: this.fontFamily,
-        fontSize:   this.fontSize + "px",
-        margin: "0", padding: "0",
-        lineHeight: "1em",
-        position: "absolute", left: "0", top: "0",
-        zIndex: "9",
-        backgroundAttachment: "fixed",
-        mixBlendMode: "difference",
-      });
+    _reset(){
+      const c=this.context;
+      c.font=\`\${this.fontSize}px \${this.fontFamily}\`;
+      const cw=c.measureText("A").width;
+      this.cols=Math.floor(this.width/(this.fontSize*(cw/this.fontSize)));
+      this.rows=Math.floor(this.height/this.fontSize);
+      this.canvas.width=this.cols;this.canvas.height=this.rows;
+      Object.assign(this.pre.style,{fontFamily:this.fontFamily,fontSize:this.fontSize+"px",
+        margin:"0",padding:"0",lineHeight:"1em",position:"absolute",left:"0",top:"0",
+        zIndex:"9",backgroundAttachment:"fixed",mixBlendMode:"difference"});
     }
-    render(scene, camera) {
-      this.renderer.render(scene, camera);
-      const { width: w, height: h } = this.canvas;
-      this.context.clearRect(0, 0, w, h);
-      if (w && h) this.context.drawImage(this.renderer.domElement, 0, 0, w, h);
-      this._asciify(w, h);
-      this._hue();
+    render(scene,camera){
+      this.renderer.render(scene,camera);
+      const {width:w,height:h}=this.canvas;
+      this.context.clearRect(0,0,w,h);
+      if(w&&h)this.context.drawImage(this.renderer.domElement,0,0,w,h);
+      this._ascii(w,h);this._hue();
     }
-    _onMove(e) { this.mouse = { x: e.clientX * PX, y: e.clientY * PX }; }
-    get dx() { return (this.mouse?.x ?? 0) - this.center.x; }
-    get dy() { return (this.mouse?.y ?? 0) - this.center.y; }
-    _hue() {
-      const deg = (Math.atan2(this.dy, this.dx) * 180) / Math.PI;
-      this.deg += (deg - this.deg) * 0.075;
-      this.domElement.style.filter = \`hue-rotate(\${this.deg.toFixed(1)}deg)\`;
+    _mv(e){this.mouse={x:e.clientX*PX,y:e.clientY*PX};}
+    get dx(){return(this.mouse?.x??0)-this.center.x;}
+    get dy(){return(this.mouse?.y??0)-this.center.y;}
+    _hue(){
+      const d=(Math.atan2(this.dy,this.dx)*180)/Math.PI;
+      this.deg+=(d-this.deg)*0.075;
+      this.domElement.style.filter=\`hue-rotate(\${this.deg.toFixed(1)}deg)\`;
     }
-    _asciify(w, h) {
-      if (!w || !h) return;
-      const data = this.context.getImageData(0, 0, w, h).data;
-      let str = "";
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const i = (x + y * w) * 4;
-          const [r, g, b, a] = [data[i], data[i+1], data[i+2], data[i+3]];
-          if (a === 0) { str += " "; continue; }
-          let gray = (0.3*r + 0.6*g + 0.1*b) / 255;
-          let idx  = Math.floor((1 - gray) * (this.charset.length - 1));
-          if (this.invert) idx = this.charset.length - idx - 1;
-          str += this.charset[idx];
+    _ascii(w,h){
+      if(!w||!h)return;
+      const data=this.context.getImageData(0,0,w,h).data;
+      let str="";
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const i=(x+y*w)*4;
+          const[r,g,b,a]=[data[i],data[i+1],data[i+2],data[i+3]];
+          if(a===0){str+=" ";continue;}
+          let gray=(0.3*r+0.6*g+0.1*b)/255;
+          let idx=Math.floor((1-gray)*(this.charset.length-1));
+          if(this.invert)idx=this.charset.length-idx-1;
+          str+=this.charset[idx];
         }
-        str += "\\n";
+        str+="\\n";
       }
-      this.pre.innerHTML = str;
+      this.pre.innerHTML=str;
     }
-    dispose() {
-      document.removeEventListener("mousemove", this._onMove);
-    }
+    dispose(){document.removeEventListener("mousemove",this._mv);}
   }
 
   class CanvasTxt {
-    constructor(txt, { fontSize = 200, fontFamily = "Arial", color = "#fdf9f3" } = {}) {
-      this.canvas = document.createElement("canvas");
-      this.ctx    = this.canvas.getContext("2d");
-      this.txt    = txt;
-      this.font   = \`600 \${fontSize}px \${fontFamily}\`;
-      this.color  = color;
-      this.ctx.font = this.font;
-      const m = this.ctx.measureText(txt);
-      this.canvas.width  = Math.ceil(m.width) + 20;
-      this.canvas.height = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) + 20;
+    constructor(txt,{fontSize=200,fontFamily="Arial",color="#fdf9f3"}={}){
+      this.canvas=document.createElement("canvas");
+      this.ctx=this.canvas.getContext("2d");
+      this.txt=txt;this.font=\`600 \${fontSize}px \${fontFamily}\`;this.color=color;
+      this.ctx.font=this.font;
+      const m=this.ctx.measureText(txt);
+      this.canvas.width=Math.ceil(m.width)+20;
+      this.canvas.height=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent)+20;
     }
-    render() {
-      const ctx = this.ctx;
-      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      ctx.fillStyle = this.color;
-      ctx.font      = this.font;
-      const m = ctx.measureText(this.txt);
-      ctx.fillText(this.txt, 10, 10 + m.actualBoundingBoxAscent);
+    render(){
+      const c=this.ctx;c.clearRect(0,0,this.canvas.width,this.canvas.height);
+      c.fillStyle=this.color;c.font=this.font;
+      const m=c.measureText(this.txt);
+      c.fillText(this.txt,10,10+m.actualBoundingBoxAscent);
     }
-    get width()   { return this.canvas.width; }
-    get height()  { return this.canvas.height; }
-    get texture() { return this.canvas; }
+    get width(){return this.canvas.width;}
+    get height(){return this.canvas.height;}
+    get texture(){return this.canvas;}
   }
 
   class CanvAscii {
-    constructor({ text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves }, container, w, h) {
-      this.container       = container;
-      this.width           = w;
-      this.height          = h;
-      this.textString      = text;
-      this.asciiFontSize   = asciiFontSize;
-      this.textFontSize    = textFontSize;
-      this.textColor       = textColor;
-      this.planeBaseHeight = planeBaseHeight;
-      this.enableWaves     = enableWaves;
-      this.mouse           = { x: w / 2, y: h / 2 };
-      this.camera          = new THREE.PerspectiveCamera(45, w / h, 1, 1000);
-      this.camera.position.z = 30;
-      this.scene           = new THREE.Scene();
-      this._onMove         = this._onMove.bind(this);
+    constructor({text,asciiFontSize,textFontSize,textColor,planeBaseHeight,enableWaves},container,w,h){
+      this.container=container;this.width=w;this.height=h;
+      this.textString=text;this.asciiFontSize=asciiFontSize;this.textFontSize=textFontSize;
+      this.textColor=textColor;this.planeBaseHeight=planeBaseHeight;this.enableWaves=enableWaves;
+      this.mouse={x:w/2,y:h/2};
+      this.camera=new THREE.PerspectiveCamera(45,w/h,1,1000);
+      this.camera.position.z=30;
+      this.scene=new THREE.Scene();
+      this._mv=this._mv.bind(this);
     }
-    async init() {
-      try {
-        await document.fonts.load(\`600 200px "IBM Plex Mono"\`);
-        await document.fonts.load(\`500 12px "IBM Plex Mono"\`);
-      } catch (_) {}
+    async init(){
+      try{await document.fonts.load(\`600 200px "IBM Plex Mono"\`);}catch(_){}
       await document.fonts.ready;
-      this._setMesh();
-      this._setRenderer();
+      this._mesh();this._renderer();
     }
-    _setMesh() {
-      this.txtCanvas = new CanvasTxt(this.textString, {
-        fontSize:   this.textFontSize,
-        fontFamily: "IBM Plex Mono, monospace",
-        color:      this.textColor,
-      });
-      this.txtCanvas.render();
-      this.texture = new THREE.CanvasTexture(this.txtCanvas.texture);
-      this.texture.minFilter = THREE.NearestFilter;
-      const asp   = this.txtCanvas.width / this.txtCanvas.height;
-      const baseH = this.planeBaseHeight;
-      this.geometry = new THREE.PlaneGeometry(baseH * asp, baseH, 36, 36);
-      this.material = new THREE.ShaderMaterial({
-        vertexShader, fragmentShader,
-        transparent: true,
-        uniforms: {
-          uTime:        { value: 0 },
-          mouse:        { value: 1.0 },
-          uTexture:     { value: this.texture },
-          uEnableWaves: { value: this.enableWaves ? 1.0 : 0.0 },
-        },
-      });
-      this.mesh = new THREE.Mesh(this.geometry, this.material);
+    _mesh(){
+      this.tc=new CanvasTxt(this.textString,{fontSize:this.textFontSize,fontFamily:"IBM Plex Mono,monospace",color:this.textColor});
+      this.tc.render();
+      this.tex=new THREE.CanvasTexture(this.tc.texture);
+      this.tex.minFilter=THREE.NearestFilter;
+      const asp=this.tc.width/this.tc.height,bh=this.planeBaseHeight;
+      this.geo=new THREE.PlaneGeometry(bh*asp,bh,36,36);
+      this.mat=new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,transparent:true,
+        uniforms:{uTime:{value:0},mouse:{value:1},uTexture:{value:this.tex},uEnableWaves:{value:this.enableWaves?1:0}}});
+      this.mesh=new THREE.Mesh(this.geo,this.mat);
       this.scene.add(this.mesh);
     }
-    _setRenderer() {
-      this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-      this.renderer.setPixelRatio(1);
-      this.renderer.setClearColor(0x000000, 0);
-      this.filter = new AsciiFilter(this.renderer, {
-        fontFamily: "IBM Plex Mono, monospace",
-        fontSize:   this.asciiFontSize,
-        invert:     true,
-      });
-      this.container.appendChild(this.filter.domElement);
-      this.setSize(this.width, this.height);
-      this.container.addEventListener("mousemove", this._onMove);
-      this.container.addEventListener("touchmove", this._onMove);
+    _renderer(){
+      this.rdr=new THREE.WebGLRenderer({antialias:false,alpha:true});
+      this.rdr.setPixelRatio(1);this.rdr.setClearColor(0x000000,0);
+      this.flt=new AsciiFilter(this.rdr,{fontFamily:"IBM Plex Mono,monospace",fontSize:this.asciiFontSize,invert:true});
+      this.container.appendChild(this.flt.domElement);
+      this.setSize(this.width,this.height);
+      this.container.addEventListener("mousemove",this._mv);
+      this.container.addEventListener("touchmove",this._mv);
     }
-    setSize(w, h) {
-      this.width = w; this.height = h;
-      this.camera.aspect = w / h;
-      this.camera.updateProjectionMatrix();
-      this.filter.setSize(w, h);
-      this.center = { x: w / 2, y: h / 2 };
+    setSize(w,h){
+      this.width=w;this.height=h;
+      this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
+      this.flt.setSize(w,h);this.center={x:w/2,y:h/2};
     }
-    _onMove(evt) {
-      const e = evt.touches ? evt.touches[0] : evt;
-      const b = this.container.getBoundingClientRect();
-      this.mouse = { x: e.clientX - b.left, y: e.clientY - b.top };
+    _mv(evt){
+      const e=evt.touches?evt.touches[0]:evt;
+      const b=this.container.getBoundingClientRect();
+      this.mouse={x:e.clientX-b.left,y:e.clientY-b.top};
     }
-    load() { this._animate(); }
-    _animate() {
-      const loop = () => {
-        this.raf = requestAnimationFrame(loop);
-        this._render();
-      };
+    load(){
+      const loop=()=>{this.raf=requestAnimationFrame(loop);this._render();};
       loop();
     }
-    _render() {
-      const t = Date.now() * 0.001;
-      this.txtCanvas.render();
-      this.texture.needsUpdate = true;
-      this.mesh.material.uniforms.uTime.value = Math.sin(t);
-      const rx = Math.map(this.mouse.y, 0, this.height,  0.5, -0.5);
-      const ry = Math.map(this.mouse.x, 0, this.width,  -0.5,  0.5);
-      this.mesh.rotation.x += (rx - this.mesh.rotation.x) * 0.05;
-      this.mesh.rotation.y += (ry - this.mesh.rotation.y) * 0.05;
-      this.filter.render(this.scene, this.camera);
+    _render(){
+      const t=Date.now()*.001;
+      this.tc.render();this.tex.needsUpdate=true;
+      this.mat.uniforms.uTime.value=Math.sin(t);
+      const rx=Math.map(this.mouse.y,0,this.height,.5,-.5);
+      const ry=Math.map(this.mouse.x,0,this.width,-.5,.5);
+      this.mesh.rotation.x+=(rx-this.mesh.rotation.x)*.05;
+      this.mesh.rotation.y+=(ry-this.mesh.rotation.y)*.05;
+      this.flt.render(this.scene,this.camera);
     }
-    dispose() {
+    dispose(){
       cancelAnimationFrame(this.raf);
-      this.filter?.dispose();
-      if (this.filter?.domElement?.parentNode) {
-        this.container.removeChild(this.filter.domElement);
-      }
-      this.container.removeEventListener("mousemove", this._onMove);
-      this.container.removeEventListener("touchmove", this._onMove);
-      this.scene.traverse(obj => {
-        if (obj.isMesh) {
-          obj.geometry?.dispose();
-          if (obj.material) {
-            Object.values(obj.material).forEach(v => v?.dispose?.());
-            obj.material.dispose();
-          }
+      this.flt?.dispose();
+      if(this.flt?.domElement?.parentNode)this.container.removeChild(this.flt.domElement);
+      this.container.removeEventListener("mousemove",this._mv);
+      this.container.removeEventListener("touchmove",this._mv);
+      this.scene.traverse(o=>{
+        if(o.isMesh){
+          o.geometry?.dispose();
+          if(o.material){Object.values(o.material).forEach(v=>v?.dispose?.());o.material.dispose();}
         }
       });
       this.scene.clear();
-      this.renderer?.dispose();
-      this.renderer?.forceContextLoss();
+      this.rdr?.dispose();this.rdr?.forceContextLoss();
     }
   }
 
-  // ── Bootstrap com suporte a SPA ──────────────────────────────────
-  let instance = null;
-  let ro = null;
+  // ── Estado global ── guardado no window para sobreviver a navs ──
+  window.__ascii = window.__ascii || { instance: null, ro: null };
 
   async function initHeader() {
+    const state = window.__ascii;
+
     // Limpa instância anterior
-    if (ro)       { ro.disconnect(); ro = null; }
-    if (instance) { instance.dispose(); instance = null; }
+    if (state.ro)       { state.ro.disconnect(); state.ro = null; }
+    if (state.instance) { state.instance.dispose(); state.instance = null; }
 
     const ROOT = document.getElementById("ascii-header-root");
     if (!ROOT) return;
 
+    // Pequeno delay pra garantir que o DOM do Quartz terminou de montar
+    await new Promise(r => setTimeout(r, 50));
+
     const { width, height } = ROOT.getBoundingClientRect();
-    if (width === 0 || height === 0) return;
+    if (!width || !height) return;
 
-    const TEXT         = ROOT.dataset.text        || "PrismaVision";
-    const ASCII_FS     = Number(ROOT.dataset.asciiFontSize) || 8;
-    const TEXT_FS      = Number(ROOT.dataset.textFontSize)  || 200;
-    const TEXT_COLOR   = ROOT.dataset.textColor   || "#fdf9f3";
-    const ENABLE_WAVES = ROOT.dataset.enableWaves !== "false";
+    const TEXT   = ROOT.dataset.text        || "PrismaVision";
+    const AFS    = Number(ROOT.dataset.asciiFontSize) || 8;
+    const TFS    = Number(ROOT.dataset.textFontSize)  || 200;
+    const COLOR  = ROOT.dataset.textColor   || "#fdf9f3";
+    const WAVES  = ROOT.dataset.enableWaves !== "false";
 
-    instance = new CanvAscii(
-      { text: TEXT, asciiFontSize: ASCII_FS, textFontSize: TEXT_FS,
-        textColor: TEXT_COLOR, planeBaseHeight: 8, enableWaves: ENABLE_WAVES },
+    state.instance = new CanvAscii(
+      { text:TEXT, asciiFontSize:AFS, textFontSize:TFS, textColor:COLOR, planeBaseHeight:8, enableWaves:WAVES },
       ROOT, width, height
     );
-    await instance.init();
-    instance.load();
+    await state.instance.init();
+    state.instance.load();
 
-    ro = new ResizeObserver(([entry]) => {
-      const { width: w, height: h } = entry.contentRect;
-      if (w > 0 && h > 0) instance?.setSize(w, h);
+    state.ro = new ResizeObserver(([e]) => {
+      const {width:w,height:h} = e.contentRect;
+      if(w&&h) state.instance?.setSize(w,h);
     });
-    ro.observe(ROOT);
+    state.ro.observe(ROOT);
   }
 
-  function loadThreeAndInit() {
-    if (window.THREE) {
-      // Three.js já carregado, só reinicia o header
-      initHeader();
-      return;
-    }
+  function start() {
+    if (window.THREE) { initHeader(); return; }
     const s = document.createElement("script");
     s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
     s.onload = initHeader;
     document.head.appendChild(s);
   }
 
-  // Roda no load inicial e em cada navegação SPA do Quartz
-  document.addEventListener("nav", loadThreeAndInit);
-  loadThreeAndInit();
+  // Listener de nav registrado só uma vez
+  document.addEventListener("nav", initHeader);
+  start();
 })();
 `
-
-  return AsciiHeader
-}) satisfies QuartzComponentConstructor

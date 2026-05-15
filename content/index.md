@@ -1,10 +1,6 @@
 ---
-title: Welcome to Quartz 4
+title: 𝑩𝒆𝒎-𝑽𝒊𝒏𝒅𝒐𝒔 ⋅⁺₊✧
 ---
-Quartz is a fast, batteries-included static-site generator that transforms Markdown content into fully functional websites. Thousands of students, developers, and teachers publish personal notes, wikis, and [digital gardens](https://jzhao.xyz/posts/networked-thought) to the web.
+PrismaVision é o meu portal pessoal para reviews de jogos a afins.
 
-See the [official documentation](https://quartz.jzhao.xyz/) for more details.
-
-Teste
-Teste 2
-Teste 3 5 0
+Talvez futuramente se expanda para reviews de música, quem sabe até de filmes. Mas o foco principal vai ser apoiar as páginas de Curador na Steam.
